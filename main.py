@@ -1,8 +1,11 @@
 import os
+import json
 import feedparser
 from openai import OpenAI
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.oauth2.credentials import Credentials
 
 # ============================
 # OpenAI クライアント
@@ -10,7 +13,27 @@ from googleapiclient.http import MediaFileUpload
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # ============================
-# ニュース取得（summary が無い場合にも対応）
+# YouTube OAuth2 認証
+# ============================
+def get_youtube_service():
+    oauth_json = os.getenv("YOUTUBE_OAUTH_JSON")
+    data = json.loads(oauth_json)
+
+    scopes = ["https://www.googleapis.com/auth/youtube.upload"]
+
+    with open("temp_credentials.json", "w") as f:
+        json.dump(data, f)
+
+    flow = InstalledAppFlow.from_client_secrets_file(
+        "temp_credentials.json", scopes=scopes
+    )
+
+    creds = flow.run_local_server(port=0)
+
+    return build("youtube", "v3", credentials=creds)
+
+# ============================
+# ニュース取得
 # ============================
 def fetch_news(rss_url):
     feed = feedparser.parse(rss_url)
@@ -19,15 +42,10 @@ def fetch_news(rss_url):
     for entry in feed.entries[:5]:
         summary = None
 
-        # summary があれば使う
         if hasattr(entry, "summary"):
             summary = entry.summary
-
-        # description があれば使う
         elif hasattr(entry, "description"):
             summary = entry.description
-
-        # どれも無ければ title を代用
         else:
             summary = entry.title
 
@@ -40,7 +58,7 @@ def fetch_news(rss_url):
     return items
 
 # ============================
-# ニュース要約（OpenAI）
+# 要約生成
 # ============================
 def summarize_news(items):
     text = "\n".join([f"タイトル: {i['title']}\n概要: {i['summary']}" for i in items])
@@ -53,7 +71,7 @@ def summarize_news(items):
     return res.choices[0].message.content
 
 # ============================
-# スクリプト生成（OpenAI）
+# スクリプト生成
 # ============================
 def generate_script(summary):
     prompt = f"""
@@ -74,8 +92,6 @@ def generate_script(summary):
 # 音声生成（OpenAI TTS）
 # ============================
 def generate_voice(script):
-    print("OpenAI音声生成中...")
-
     response = client.audio.speech.create(
         model="gpt-4o-mini-tts",
         voice="alloy",
@@ -92,7 +108,7 @@ def generate_voice(script):
 # YouTube アップロード
 # ============================
 def upload_to_youtube(title, description, file_path):
-    youtube = build("youtube", "v3", developerKey=os.getenv("YOUTUBE_API_KEY"))
+    youtube = get_youtube_service()
 
     request_body = {
         "snippet": {
@@ -122,22 +138,11 @@ def upload_to_youtube(title, description, file_path):
 def main():
     rss_url = "https://news.yahoo.co.jp/rss/topics/top-picks.xml"
 
-    print("ニュース取得中...")
     items = fetch_news(rss_url)
-
-    print("要約生成中...")
     summary = summarize_news(items)
-
-    print("スクリプト生成中...")
     script = generate_script(summary)
-
-    print("音声生成中...")
     voice_file = generate_voice(script)
-
-    print("YouTube アップロード中...")
     upload_to_youtube("今日のAIニュース", summary, voice_file)
-
-    print("完了！")
 
 if __name__ == "__main__":
     main()
