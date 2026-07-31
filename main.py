@@ -7,13 +7,12 @@ from googleapiclient.http import MediaFileUpload
 import ffmpeg
 
 # -------------------------
-# APIキー（あなたのキーを貼る）
+# APIキー（環境変数から取得）
 # -------------------------
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 ELEVEN_API_KEY = os.getenv("ELEVEN_API_KEY")
 VOICE_ID = os.getenv("VOICE_ID")
-
 
 openai.api_key = OPENAI_API_KEY
 
@@ -24,7 +23,12 @@ def get_latest_news():
     url = "https://news.yahoo.co.jp/rss/topics/business.xml"
     feed = feedparser.parse(url)
     latest = feed.entries[0]
-    return latest.title, latest.summary
+
+    title = getattr(latest, "title", "")
+    # summary がなければ description を使う
+    summary = getattr(latest, "summary", getattr(latest, "description", ""))
+
+    return title, summary
 
 # -------------------------
 # ② 台本生成（10分動画）
@@ -78,9 +82,9 @@ def generate_voice(text):
 # -------------------------
 def generate_background():
     with open("background.png", "wb") as f:
-        f.write(requests.get(
-            "https://i.imgur.com/3ZQ3ZQF.png"
-        ).content)
+        f.write(
+            requests.get("https://i.imgur.com/3ZQ3ZQF.png").content
+        )
 
 # -------------------------
 # ⑤ 動画生成（FFmpeg）
