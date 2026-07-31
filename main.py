@@ -87,14 +87,15 @@ def generate_background():
         )
 
 # -------------------------
-# ⑤ 動画生成（FFmpeg）
+# ⑤ 動画生成（FFmpeg） ← 修正済み
 # -------------------------
 def generate_video():
+    background = ffmpeg.input("background.png", loop=1)
+    audio = ffmpeg.input("voice.mp3")
+
     (
         ffmpeg
-        .input("background.png", loop=1)
-        .input("voice.mp3")
-        .output("output.mp4", vcodec="libx264", acodec="aac", shortest=None)
+        .output(background, audio, "output.mp4", vcodec="libx264", acodec="aac", shortest=None)
         .run()
     )
 
