@@ -1,7 +1,7 @@
 import os
 import feedparser
 import requests
-import openai
+from openai import OpenAI
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 import ffmpeg
@@ -14,7 +14,7 @@ YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 ELEVEN_API_KEY = os.getenv("ELEVEN_API_KEY")
 VOICE_ID = os.getenv("VOICE_ID")
 
-openai.api_key = OPENAI_API_KEY
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # -------------------------
 # ① 最新ニュース取得（Yahoo経済）
@@ -25,7 +25,6 @@ def get_latest_news():
     latest = feed.entries[0]
 
     title = getattr(latest, "title", "")
-    # summary がなければ description を使う
     summary = getattr(latest, "summary", getattr(latest, "description", ""))
 
     return title, summary
@@ -59,11 +58,12 @@ def generate_script(title, summary):
 ・煽り禁止、断定禁止
 """
 
-    res = openai.ChatCompletion.create(
+    res = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}]
     )
-    return res.choices[0].message["content"]
+
+    return res.choices[0].message.content
 
 # -------------------------
 # ③ 音声生成（ElevenLabs）
