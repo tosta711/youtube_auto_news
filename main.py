@@ -10,17 +10,33 @@ from googleapiclient.http import MediaFileUpload
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # ============================
-# ニュース取得
+# ニュース取得（summary が無い場合にも対応）
 # ============================
 def fetch_news(rss_url):
     feed = feedparser.parse(rss_url)
     items = []
+
     for entry in feed.entries[:5]:
+        summary = None
+
+        # summary があれば使う
+        if hasattr(entry, "summary"):
+            summary = entry.summary
+
+        # description があれば使う
+        elif hasattr(entry, "description"):
+            summary = entry.description
+
+        # どれも無ければ title を代用
+        else:
+            summary = entry.title
+
         items.append({
             "title": entry.title,
-            "summary": entry.summary,
+            "summary": summary,
             "link": entry.link
         })
+
     return items
 
 # ============================
