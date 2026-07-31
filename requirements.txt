@@ -1,5 +1,4 @@
-feedparser
-requests
 openai
 google-api-python-client
-ffmpeg-python
+google-auth-oauthlib
+feedparser
