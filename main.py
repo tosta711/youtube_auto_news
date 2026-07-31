@@ -2,10 +2,9 @@ import os
 import json
 import feedparser
 from openai import OpenAI
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.oauth2.credentials import Credentials
 
 # ============================
 # OpenAI クライアント
@@ -13,22 +12,20 @@ from google.oauth2.credentials import Credentials
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # ============================
-# YouTube OAuth2 認証
+# YouTube サービスアカウント認証（完成版）
 # ============================
 def get_youtube_service():
-    oauth_json = os.getenv("YOUTUBE_OAUTH_JSON")
-    data = json.loads(oauth_json)
+    sa_json = os.getenv("YOUTUBE_SERVICE_JSON")
+    if sa_json is None:
+        raise Exception("YOUTUBE_SERVICE_JSON が読み込めません。GitHub Secrets を確認してください。")
+
+    data = json.loads(sa_json)
 
     scopes = ["https://www.googleapis.com/auth/youtube.upload"]
 
-    with open("temp_credentials.json", "w") as f:
-        json.dump(data, f)
-
-    flow = InstalledAppFlow.from_client_secrets_file(
-        "temp_credentials.json", scopes=scopes
+    creds = service_account.Credentials.from_service_account_info(
+        data, scopes=scopes
     )
-
-    creds = flow.run_local_server(port=0)
 
     return build("youtube", "v3", credentials=creds)
 
@@ -40,15 +37,7 @@ def fetch_news(rss_url):
     items = []
 
     for entry in feed.entries[:5]:
-        summary = None
-
-        if hasattr(entry, "summary"):
-            summary = entry.summary
-        elif hasattr(entry, "description"):
-            summary = entry.description
-        else:
-            summary = entry.title
-
+        summary = getattr(entry, "summary", getattr(entry, "description", entry.title))
         items.append({
             "title": entry.title,
             "summary": summary,
